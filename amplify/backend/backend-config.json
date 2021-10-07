@@ -43,5 +43,11 @@
         }
       }
     }
+  },
+  "storage": {
+    "octococcus": {
+      "service": "S3",
+      "providerPlugin": "awscloudformation"
+    }
   }
 }
