@@ -12,8 +12,19 @@
       "AmplifyAppId": "d1kygzvg17dxwp"
     },
     "categories": {
+      "function": {
+        "VOC2PostConfirmation": {
+          "GROUP": "NotAuthenticated",
+          "deploymentBucketName": "amplify-amplify492d9d9b7a2a4-staging-183212-deployment",
+          "s3Key": "amplify-builds/VOC2PostConfirmation-68717558564b557a7434-build.zip"
+        },
+        "AdminQueriesb83f6c94": {
+          "deploymentBucketName": "amplify-amplify492d9d9b7a2a4-staging-183212-deployment",
+          "s3Key": "amplify-builds/AdminQueriesb83f6c94-58346777535739426d33-build.zip"
+        }
+      },
       "auth": {
-        "verboseoctococcusf3f34431": {}
+        "VOC2": {}
       }
     }
   }
