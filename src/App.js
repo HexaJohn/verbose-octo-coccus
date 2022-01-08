@@ -1,94 +1,179 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from "react";
+import logo from './cryodrive-icon-fullcolor-square.png';
 import './App.css';
-import { API, Storage } from 'aws-amplify';
-import { withAuthenticator, AmplifySignOut } from '@aws-amplify/ui-react';
-import { listNotes } from './graphql/queries';
-import { createNote as createNoteMutation, deleteNote as deleteNoteMutation } from './graphql/mutations';
+import Amplify, { Auth, Hub } from "aws-amplify";
+import { AmplifyAuthenticator, AmplifySignOut, AmplifySignIn, a } from '@aws-amplify/ui-react';
+import { AuthState, onAuthUIStateChange } from '@aws-amplify/ui-components';
+import config from './aws-exports';
 
-const initialFormState = { name: '', description: '' }
+import {PaymentElement} from '@stripe/react-stripe-js';
+import {Elements} from '@stripe/react-stripe-js';
+import {loadStripe} from '@stripe/stripe-js';
+import SetupForm from './SetupForm';
 
-function App() {
-  const [notes, setNotes] = useState([]);
-  const [formData, setFormData] = useState(initialFormState);
+Amplify.configure(config);
 
-  useEffect(() => {
-    fetchNotes();
-  }, []);
+const stripePromise = loadStripe('pk_test_51J99fLE8TXuYTMnRE9dGctQxw2CCClkRzcM3ExvWuzjhDGVHBviF5Y3mK6dth0hb120Ej0mG0YpSBolVCmcQZwHM00rcg3RYqb');
 
-  async function fetchNotes() {
-    const apiData = await API.graphql({ query: listNotes });
-    const notesFromAPI = apiData.data.listNotes.items;
-    await Promise.all(notesFromAPI.map(async note => {
-      if (note.image) {
-        const image = await Storage.get(note.image);
-        note.image = image;
-      }
-      return note;
-    }))
-    setNotes(apiData.data.listNotes.items);
-  }
+/**
+ * This code is based on Nader Dabit's tutorial for custom Cognito authentication
+ * using AWS Amplify and React: https://www.youtube.com/watch?v=JaVu-sS3ixg&t=24s
+ *
+ * It's 99% the same as the video, but I've sprinkled a few niceties here and there.
+ */
+  
+ const initialFormState = {
+   username: "",
+   password: "",
+   email: "",
+   authCode: "",
+   formType: "signIn",
+ };
+ 
+ function App() {
 
-  async function onChange(e) {
-    if (!e.target.files[0]) return
-    const file = e.target.files[0];
-    setFormData({ ...formData, image: file.name });
-    await Storage.put(file.name, file);
-    fetchNotes();
-  }
 
-  async function createNote() {
-    if (!formData.name || !formData.description) return;
-    await API.graphql({ query: createNoteMutation, variables: { input: formData } });
-    if (formData.image) {
-      const image = await Storage.get(formData.image);
-      formData.image = image;
-    }
-    setNotes([ ...notes, formData ]);
-    setFormData(initialFormState);
-  }
 
-  async function deleteNote({ id }) {
-    const newNotesArray = notes.filter(note => note.id !== id);
-    setNotes(newNotesArray);
-    await API.graphql({ query: deleteNoteMutation, variables: { input: { id } }});
-  }
+   const [formState, updateFormState] = useState(initialFormState);
+ 
+   const [user, updateUser] = useState(null);
 
-  return (
-    <div className="App">
-      <h1>Auth Debug Page</h1>
-      <input
-        onChange={e => setFormData({ ...formData, 'name': e.target.value})}
-        placeholder="Key"
-        value={formData.name}
-      />
-      <input
-        onChange={e => setFormData({ ...formData, 'description': e.target.value})}
-        placeholder="Value"
-        value={formData.description}
-      />
-      
-      <input
-        type="file"
-        onChange={onChange}
-      />
-      <button onClick={createNote}>Create KVPw$File?</button>
-      <div style={{marginBottom: 30}}>
-      {
-        notes.map(note => (
-          <div key={note.id || note.name}>
-            <h2>{note.name}</h2>
-            <p>{note.description}</p>
-            <button onClick={() => deleteNote(note)}>Delete note</button>
-            {
-              note.image && <img src={note.image} style={{width: 400}} />
-            }
-          </div>
-        ))
-      }
-      </div>
-      <AmplifySignOut />
-    </div>
-  );
-}
 
-export default withAuthenticator(App);
+   const updateOptions = async () => {
+     presetOptions['clientSecret'] = Auth.userAttributes();
+   }
+ 
+   var presetOptions = {
+    // passing the client secret obtained in step 2
+    clientSecret: 'seti_1KFGTRE8TXuYTMnRQDB0pdF2_secret_Kv6gnytqPpYsjNKFCK2ueu7RhkFT02r',
+    // Fully customizable with appearance API.
+    appearance: {/*...*/},
+    };
+
+   const checkUser = async () => {
+     try {
+       const user = await Auth.currentAuthenticatedUser();
+ 
+       updateUser(user);
+ 
+       console.log("got user", user);
+ 
+       updateFormState(() => ({ ...formState, formType: "signedIn" }));
+     } catch (err) {
+       console.log("checkUser error", err);
+       updateFormState(() => ({ ...formState, formType: "signIn" }));
+     }
+   };
+ 
+   // Skip this if you're not using Hub. You can call updateFormState function right
+   // after the Auth.signOut() call in the button.
+   
+   const setAuthListener = async () => {
+     Hub.listen("auth", (data) => {
+       switch (data.payload.event) {
+         case "signOut":
+           console.log(data);
+ 
+           updateFormState(() => ({
+             ...formState,
+             formType: "signIn",
+           }));
+ 
+           break;
+         case "signIn":
+           console.log(data);
+ 
+           break;
+       }
+     });
+   };
+   
+ 
+   useEffect(() => {
+     checkUser();
+     setAuthListener();
+   }, []);
+ 
+   const onChange = (e) => {
+     e.persist();
+     updateFormState(() => ({ ...formState, [e.target.name]: e.target.value }));
+   };
+ 
+   const { formType } = formState;
+ 
+   const signUp = async () => {
+     const { username, email, password } = formState;
+ 
+     await Auth.signUp({ username, password, attributes: { email } });
+ 
+     updateFormState(() => ({ ...formState, formType: "confirmSignUp" }));
+   };
+ 
+   const confirmSignUp = async () => {
+     const { username, authCode } = formState;
+ 
+     await Auth.confirmSignUp(username, authCode);
+ 
+     updateFormState(() => ({ ...formState, formType: "signIn" }));
+   };
+ 
+   const signIn = async () => {
+     const { username, password } = formState;
+ 
+     await Auth.signIn(username, password);
+ 
+     updateFormState(() => ({ ...formState, formType: "signedIn" }));
+
+     presetOptions['clientSecret'] = user.attributes["custom:StripeClientSecret"];
+
+     console.log("updated options", presetOptions);
+
+   };
+ 
+   // console.log(formType);
+ 
+   return (
+     <>
+       <h1>App</h1>
+ 
+       {formType === "signIn" && (
+         
+         <div>
+           <p>Welcome back</p>
+           <p>Because you're accessing sensitive info, you need to verify your password.</p>
+           <input name="username" onChange={onChange} placeholder="username" />
+           <input
+             name="password"
+             type="password"
+             onChange={onChange}
+             placeholder="password"
+           />
+           <button onClick={signIn}>Sign In</button>
+
+         </div>
+       )}
+ 
+       {formType === "signedIn" && (
+         <div>
+           <h2>
+             Welcome the app. {user.username}
+           </h2>
+            <Elements stripe={stripePromise} options={presetOptions}>
+              <SetupForm />
+            </Elements>
+           <button
+             onClick={() => {
+               Auth.signOut();
+             }}
+           >
+             Sign out
+           </button>
+         </div>
+       )}
+ 
+       <hr />
+     </>
+   );
+ }
+ 
+ export default App;
