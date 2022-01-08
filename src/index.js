@@ -3,16 +3,8 @@ import ReactDOM from 'react-dom';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-
-//AWS Imports
 import Amplify from 'aws-amplify';
 import config from './aws-exports';
-
-//Stripe Imports
-import {Elements} from '@stripe/react-stripe-js';
-import {loadStripe} from '@stripe/stripe-js';
-import CheckoutForm from './CheckoutForm';
-
 Amplify.configure(config);
 
 ReactDOM.render(
